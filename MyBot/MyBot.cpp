@@ -3,6 +3,7 @@
 #include <dpp/nlohmann/json.hpp>
 #include <curl/curl.h>
 #include <iostream>
+#include <cctype>
 
 /*
 Place your bot token in the line below.
@@ -22,6 +23,29 @@ size_t writeCallback(void* contents, size_t size, size_t nmemb, void* userp) {
     return size * nmemb;
 }
 
+//Funcstion that is made for capatilizing words in the toppic   
+std::string capitalize_words(const std::string str) {
+    std::string result = "";
+    bool capatilize = true;
+
+    for (char ch : str) {
+    
+        if (ch == ' ') {
+            result += '_';
+            capatilize = true;
+        }
+        else if (capatilize && isalpha(ch)) {
+            result += toupper(ch);
+            capatilize = false;
+        }
+        else {
+            result += tolower(ch);
+        }
+    }
+
+    return result;
+}
+
 std::string fetch(const std::string& topic) {
     CURL* curl;
     CURLcode res;
@@ -29,8 +53,8 @@ std::string fetch(const std::string& topic) {
 
     curl = curl_easy_init();
     if (curl) {
-        std::string url = "https://en.wikipedia.org/api/rest_v1/page/summary/" + topic;
-        std::replace(url.begin(), url.end(), ' ', '_');
+        std::string formattedTopic = capitalize_words(topic);
+        std::string url = "https://en.wikipedia.org/api/rest_v1/page/summary/" + formattedTopic;
 
         std::cout << "Fetching URL: " << url << std::endl;
 
@@ -50,9 +74,9 @@ std::string fetch(const std::string& topic) {
         // Clean up
         curl_easy_cleanup(curl);
     }
-    else {
-        std::cerr << "Curl Init Fail" << std::endl;
-    }
+        else {
+            std::cerr << "Curl Init Fail" << std::endl;
+        }
 
     return readBuffer; // Return an empty string, since we don't have a buffer
 }
@@ -207,3 +231,5 @@ int main() {
 //our fetch isn't working at all, we don't know why
 
 //we are able to get the data from the writeCallback method, but we can't extract it properly. Must figure out how to fix next time
+
+//we need to adapt the inputs to match the way wikipedia wants it to be searched
