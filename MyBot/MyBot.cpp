@@ -18,7 +18,7 @@ const std::string BOT_TOKEN = ""; // Your bot token
 
 // std string function for fetching wikipedia api
 size_t writeCallback(void* contents, size_t size, size_t nmemb, void* userp) {
-    ((std::string*)userp)->append((char*)contents,size*nmemb);
+    ((std::string*)userp)->append((char*)contents, size * nmemb);
     //std::cout.write(static_cast<const char*>(contents), size * nmemb); // Print to stdout
     return size * nmemb;
 }
@@ -29,7 +29,7 @@ std::string capitalize_words(const std::string str) {
     bool capatilize = true;
 
     for (char ch : str) {
-    
+
         if (ch == ' ') {
             result += '_';
             capatilize = true;
@@ -77,7 +77,8 @@ std::string search(const std::string topic) {
 
     return readBuffer;
 }
-
+std::string formattedTopic = "";
+std::string fullTitle = "";
 std::string fetch(const std::string& topic) {
     CURL* curl;
     CURLcode res;
@@ -85,7 +86,7 @@ std::string fetch(const std::string& topic) {
 
     curl = curl_easy_init();
     if (curl) {
-        std::string formattedTopic = capitalize_words(topic);
+        formattedTopic = capitalize_words(topic);
         std::string url = "https://en.wikipedia.org/api/rest_v1/page/summary/" + formattedTopic;
 
         std::cout << "Fetching URL: " << url << std::endl;
@@ -99,13 +100,13 @@ std::string fetch(const std::string& topic) {
         res = curl_easy_perform(curl);
 
         // Check for errors
-        if (res != CURLE_OK || readBuffer.empty() || readBuffer.find("\"title\":\"Not found\"")!=std::string::npos) {
+        if (res != CURLE_OK || readBuffer.empty() || readBuffer.find("\"title\":\"Not found\"") != std::string::npos) {
             std::cerr << "cURL Easy Perform Failed: " << curl_easy_strerror(res) << std::endl;
             readBuffer.clear();
             std::string searchData = search(topic);
             auto json = nlohmann::json::parse(searchData);
             if (json.contains("query") && json["query"].contains("search") && !json["query"]["search"].empty()) {
-                std::string fullTitle = json["query"]["search"][0]["title"];
+                fullTitle = json["query"]["search"][0]["title"];
                 std::replace(fullTitle.begin(), fullTitle.end(), ' ', '_');
                 url = "https://en.wikipedia.org/api/rest_v1/page/summary/" + fullTitle;
                 curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
@@ -120,9 +121,9 @@ std::string fetch(const std::string& topic) {
         }
         curl_easy_cleanup(curl);
     }
-        else {
-            std::cerr << "Curl Init Fail" << std::endl;
-        }
+    else {
+        std::cerr << "Curl Init Fail" << std::endl;
+    }
 
     return readBuffer; // Return an empty string, since we don't have a buffer
 }
@@ -154,7 +155,14 @@ std::string extract(const std::string& jsonData) {
 
         // Check for the "extract" key
         if (json.contains("extract")) {
-            return json["extract"].get<std::string>();
+            if (fullTitle == "") {
+                return json["extract"].get<std::string>() + "\nhttps://en.wikipedia.org/wiki/" + formattedTopic;
+            }
+            else {
+                std::string tempFullTitle = fullTitle;
+                fullTitle = "";
+                return json["extract"].get<std::string>() + "\nhttps://en.wikipedia.org/wiki/" + tempFullTitle;
+            }
         }
         else if (json.contains("description")) {
             return json["description"].get<std::string>();
@@ -210,7 +218,7 @@ int main() {
             std::vector<dpp::slashcommand> commands{
                 { "ping", "Ping pong!", bot.me.id },
                 {"factcheck", "Checks facts on a topic.", bot.me.id}
-                
+
                 // Command name: "ping", description: "Ping pong!", bot's ID
             };
 
@@ -250,7 +258,7 @@ int main() {
             {
                 event.reply(std::string("An error has happen") + e.what());
             }
-           
+
         }
         });
 
