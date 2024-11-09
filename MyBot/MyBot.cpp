@@ -46,6 +46,38 @@ std::string capitalize_words(const std::string str) {
     return result;
 }
 
+std::string search(const std::string topic) {
+    CURL* curl;
+    CURLcode res;
+    std::string readBuffer;
+
+    curl = curl_easy_init();
+    if (curl) {
+        std::string url = "https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=" + topic + "&format=json";
+        std::replace(url.begin(), url.end(), ' ', '_');
+
+        std::cout << "Searching URL: " << url << std::endl;
+
+        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeCallback);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
+        curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+
+        res = curl_easy_perform(curl);
+
+        if (res != CURLE_OK) {
+            std::cerr << "cURL Easy Perform Failed: " << curl_easy_strerror(res) << std::endl;
+        }
+
+        curl_easy_cleanup(curl);
+    }
+    else {
+        std::cerr << "Curl Init Fail" << std::endl;
+    }
+
+    return readBuffer;
+}
+
 std::string fetch(const std::string& topic) {
     CURL* curl;
     CURLcode res;
@@ -67,11 +99,25 @@ std::string fetch(const std::string& topic) {
         res = curl_easy_perform(curl);
 
         // Check for errors
-        if (res != CURLE_OK) {
+        if (res != CURLE_OK || readBuffer.empty() || readBuffer.find("\"title\":\"Not found\"")!=std::string::npos) {
             std::cerr << "cURL Easy Perform Failed: " << curl_easy_strerror(res) << std::endl;
+            readBuffer.clear();
+            std::string searchData = search(topic);
+            auto json = nlohmann::json::parse(searchData);
+            if (json.contains("query") && json["query"].contains("search") && !json["query"]["search"].empty()) {
+                std::string fullTitle = json["query"]["search"][0]["title"];
+                std::replace(fullTitle.begin(), fullTitle.end(), ' ', '_');
+                url = "https://en.wikipedia.org/api/rest_v1/page/summary/" + fullTitle;
+                curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+                curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
+                res = curl_easy_perform(curl);
+            }
         }
 
         // Clean up
+        if (res != CURLE_OK) {
+            std::cerr << "Curl Easy Perform Failed" << curl_easy_strerror(res) << std::endl;
+        }
         curl_easy_cleanup(curl);
     }
         else {
