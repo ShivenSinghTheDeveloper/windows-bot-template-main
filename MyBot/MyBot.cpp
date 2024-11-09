@@ -17,13 +17,15 @@ const std::string BOT_TOKEN = ""; // Your bot token
 
 // std string function for fetching wikipedia api
 size_t writeCallback(void* contents, size_t size, size_t nmemb, void* userp) {
-    std::cout.write(static_cast<const char*>(contents), size * nmemb); // Print to stdout
+    ((std::string*)userp)->append((char*)contents,size*nmemb);
+    //std::cout.write(static_cast<const char*>(contents), size * nmemb); // Print to stdout
     return size * nmemb;
 }
 
 std::string fetch(const std::string& topic) {
     CURL* curl;
     CURLcode res;
+    std::string  readBuffer;
 
     curl = curl_easy_init();
     if (curl) {
@@ -34,6 +36,7 @@ std::string fetch(const std::string& topic) {
 
         curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeCallback); // Set the callback
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
         curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L); // Optional: Enable verbose output for debugging
 
         // Perform the request
@@ -51,7 +54,7 @@ std::string fetch(const std::string& topic) {
         std::cerr << "Curl Init Fail" << std::endl;
     }
 
-    return ""; // Return an empty string, since we don't have a buffer
+    return readBuffer; // Return an empty string, since we don't have a buffer
 }
 
 
@@ -70,15 +73,21 @@ std::string extract(const std::string& jsonData) {
     try {
         auto json = nlohmann::json::parse(jsonData);
 
+        /*
         // Check if the response has an error message
         if (json.contains("title") && json["title"] == "Not found") {
             std::cerr << "Topic not found: " << json["title"] << std::endl;
             return "No information found.";
         }
+        */
+
 
         // Check for the "extract" key
         if (json.contains("extract")) {
-            return json["extract"];
+            return json["extract"].get<std::string>();
+        }
+        else if (json.contains("description")) {
+            return json["description"].get<std::string>();
         }
         // If "extract" is missing, check if it might be in a different part of the JSON
         else {
